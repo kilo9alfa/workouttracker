@@ -479,7 +479,7 @@
         <div class="ti-drag-handle">⠿</div>
         <div class="ti-info">
           <span class="ti-swatch" style="background:${t.color}"></span>
-          <span class="ti-name">${t.name}</span>
+          <input type="text" class="ti-name-input" data-id="${t.id}" value="${t.name}">
         </div>
         <div class="ti-actions">
           <input type="number" class="ti-dur-input" data-id="${t.id}"
