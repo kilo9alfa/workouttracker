@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f172a">
+  <title>Workout Tracker</title>
+  <link rel="manifest" href="/workout/manifest.json">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💪</text></svg>">
+  <link rel="stylesheet" href="/workout/styles.css">
+</head>
+<body>
+  <div id="app">
+    <header id="header">
+      <h1>Workout Tracker</h1>
+      <button id="settings-btn" aria-label="Settings">⚙</button>
+    </header>
+
+    <div id="summary-bar">
+      <div id="summary-total">
+        <span class="summary-value" id="week-total">0</span>
+        <span class="summary-label">min this week</span>
+      </div>
+      <div id="summary-types"></div>
+    </div>
+
+    <main id="main-view">
+      <div id="weeks-container"></div>
+    </main>
+
+    <!-- Log Workout Bottom Sheet -->
+    <div id="sheet-overlay" class="hidden" role="dialog" aria-modal="true">
+      <div id="sheet-backdrop"></div>
+      <div id="sheet">
+        <div id="sheet-handle"></div>
+        <h2 id="sheet-title">Log Workout</h2>
+        <div id="sheet-date"></div>
+
+        <div id="existing-workouts"></div>
+
+        <div id="type-picker">
+          <label>Exercise Type</label>
+          <div id="type-chips"></div>
+        </div>
+
+        <div id="duration-input">
+          <label>Duration (minutes)</label>
+          <div class="duration-controls">
+            <button class="dur-btn" data-delta="-5">-5</button>
+            <input type="number" id="duration" value="60" min="1" max="300" inputmode="numeric">
+            <button class="dur-btn" data-delta="5">+5</button>
+          </div>
+        </div>
+
+        <div id="notes-input">
+          <label for="notes">Notes (optional)</label>
+          <textarea id="notes" rows="2" placeholder="How was it?"></textarea>
+        </div>
+
+        <div id="sheet-actions">
+          <button id="save-btn" class="btn-primary">Save</button>
+          <button id="cancel-btn" class="btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exercise Types Settings -->
+    <div id="settings-overlay" class="hidden">
+      <div id="settings-panel">
+        <div id="settings-header">
+          <h2>Exercise Types</h2>
+          <button id="settings-close" aria-label="Close">✕</button>
+        </div>
+        <div id="types-list"></div>
+        <div id="add-type-form">
+          <input type="text" id="new-type-name" placeholder="New type name">
+          <input type="color" id="new-type-color" value="#4ade80">
+          <button id="add-type-btn" class="btn-primary">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/workout/app.js"></script>
+</body>
+</html>

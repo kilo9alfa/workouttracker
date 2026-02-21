@@ -1,0 +1,17 @@
+name = "workout-tracker"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+routes = [
+  { pattern = "kilo9alfa.com/workout*", zone_name = "kilo9alfa.com" }
+]
+
+[assets]
+directory = "public"
+binding = "ASSETS"
+not_found_handling = "none"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "workout-tracker"
+database_id = "eef137ce-dc0a-44d2-bd6d-433d15931ec2"

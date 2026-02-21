@@ -1,0 +1,17 @@
+{
+  "name": "workouttracker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute workout-tracker --file=src/db/schema.sql --remote",
+    "db:init:local": "wrangler d1 execute workout-tracker --file=src/db/schema.sql --local"
+  },
+  "dependencies": {
+    "hono": "^4.12.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.67.0"
+  }
+}
