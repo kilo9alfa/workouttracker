@@ -11,9 +11,10 @@ app.get('/', async (c) => {
 });
 
 app.post('/', async (c) => {
-  const { name, color } = await c.req.json();
+  const { name, color, default_duration_minutes } = await c.req.json();
   if (!name) return c.json({ error: 'name is required' }, 400);
-  const result = await createExerciseType(c.env.DB, c.var.userEmail, name, color || '#4ade80');
+  const duration = default_duration_minutes ? parseInt(default_duration_minutes) : null;
+  const result = await createExerciseType(c.env.DB, c.var.userEmail, name, color || '#4ade80', duration);
   return c.json(result, 201);
 });
 

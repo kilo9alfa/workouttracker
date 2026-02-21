@@ -79,6 +79,13 @@
 
   // --- Render Weeks ---
 
+  function getISOWeekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  }
+
   function renderWeeks() {
     const container = document.getElementById('weeks-container');
     const today = new Date();
@@ -92,16 +99,12 @@
 
     let html = '';
 
-    // Day headers
-    html += '<div class="day-headers">';
-    DAY_NAMES.forEach((d) => {
-      html += `<div class="day-header">${d}</div>`;
-    });
-    html += '</div>';
-
-    weeks.forEach((monday) => {
+    weeks.forEach((monday, weekIdx) => {
       const sunday = addDays(monday, 6);
-      const weekLabel = `${monday.getDate()} ${MONTH_NAMES[monday.getMonth()]} – ${sunday.getDate()} ${MONTH_NAMES[sunday.getMonth()]}`;
+      const isCurrentWeek = dateToStr(monday) === dateToStr(thisMonday);
+      const wn = getISOWeekNumber(monday);
+      const weekLabel = `${monday.getFullYear()}.W${String(wn).padStart(2, '0')}`;
+      const dateRange = `${MONTH_NAMES[monday.getMonth()]} ${monday.getDate()}–${MONTH_NAMES[sunday.getMonth()]} ${sunday.getDate()}`;
 
       // Calculate week total
       let weekTotal = 0;
@@ -110,8 +113,15 @@
         (workoutsCache[ds] || []).forEach((w) => (weekTotal += w.duration_minutes));
       }
 
-      html += '<div class="week-row">';
-      html += `<div class="week-label"><span>${weekLabel}</span><span class="week-total">${weekTotal > 0 ? weekTotal + ' min' : ''}</span></div>`;
+      html += `<div class="week-row${isCurrentWeek ? ' current-week' : ''}">`;
+
+      // Top bar: week label left, total right
+      html += '<div class="week-top">';
+      html += `<div class="week-info">${weekLabel} <span class="week-dates">${dateRange}</span></div>`;
+      html += `<div class="week-total">${weekTotal > 0 ? weekTotal + 'm' : '0m'}</div>`;
+      html += '</div>';
+
+      // Day cells
       html += '<div class="week-grid">';
 
       for (let d = 0; d < 7; d++) {
@@ -124,19 +134,34 @@
         let cellClass = 'day-cell';
         if (isToday) cellClass += ' today';
         if (isFuture) cellClass += ' future';
+        if (dayWorkouts.length > 0) cellClass += ' has-workout';
 
-        let totalMin = 0;
-        dayWorkouts.forEach((w) => (totalMin += w.duration_minutes));
+        // Fill with workout color
+        let cellStyle = '';
+        if (dayWorkouts.length === 1) {
+          cellStyle = `background:${dayWorkouts[0].exercise_type_color}`;
+        } else if (dayWorkouts.length > 1) {
+          const stops = dayWorkouts.map((w, i) => {
+            const pct1 = (i / dayWorkouts.length * 100).toFixed(0);
+            const pct2 = ((i + 1) / dayWorkouts.length * 100).toFixed(0);
+            return `${w.exercise_type_color} ${pct1}%, ${w.exercise_type_color} ${pct2}%`;
+          }).join(', ');
+          cellStyle = `background:linear-gradient(135deg, ${stops})`;
+        }
 
-        let chips = '';
-        dayWorkouts.forEach((w) => {
-          chips += `<div class="day-chip" style="background:${w.exercise_type_color}"></div>`;
-        });
+        html += `<div class="${cellClass}" data-date="${ds}" style="${cellStyle}">`;
+        html += `<span class="day-name">${DAY_NAMES[d]}</span>`;
 
-        html += `<div class="${cellClass}" data-date="${ds}">`;
-        html += `<span class="day-number">${cellDate.getDate()}</span>`;
-        if (chips) html += `<div class="day-chips">${chips}</div>`;
-        if (totalMin > 0) html += `<span class="day-duration">${totalMin}′</span>`;
+        if (dayWorkouts.length === 1) {
+          html += `<span class="day-workout-duration">${dayWorkouts[0].duration_minutes}m</span>`;
+        } else if (dayWorkouts.length > 1) {
+          html += '<div class="day-workout-stack">';
+          dayWorkouts.forEach((w) => {
+            html += `<span class="day-workout-duration">${w.duration_minutes}m</span>`;
+          });
+          html += '</div>';
+        }
+
         html += '</div>';
       }
 
@@ -147,9 +172,9 @@
 
     // Scroll to current week
     requestAnimationFrame(() => {
-      const todayCell = container.querySelector('.day-cell.today');
-      if (todayCell) {
-        todayCell.scrollIntoView({ block: 'center', behavior: 'instant' });
+      const current = container.querySelector('.week-row.current-week');
+      if (current) {
+        current.scrollIntoView({ block: 'center', behavior: 'instant' });
       }
     });
 
@@ -179,11 +204,11 @@
 
     document.getElementById('week-total').textContent = total;
 
+    // Legend: show all exercise types as color legend
     const typesEl = document.getElementById('summary-types');
-    typesEl.innerHTML = Object.entries(byType)
+    typesEl.innerHTML = exerciseTypes
       .map(
-        ([name, { minutes, color }]) =>
-          `<div class="summary-chip"><span class="dot" style="background:${color}"></span>${name} ${minutes}′</div>`
+        (t) => `<div class="summary-chip"><span class="dot" style="background:${t.color}"></span>${t.name}</div>`
       )
       .join('');
   }
@@ -197,7 +222,9 @@
 
     document.getElementById('sheet-title').textContent = 'Log Workout';
     document.getElementById('sheet-date').textContent = formatDate(dateStr);
-    document.getElementById('duration').value = 60;
+    // Default to first type's default duration, or 60
+    const firstWithDefault = exerciseTypes.find((t) => t.default_duration_minutes);
+    document.getElementById('duration').value = firstWithDefault ? firstWithDefault.default_duration_minutes : 60;
     document.getElementById('notes').value = '';
 
     renderExistingWorkouts(dateStr);
@@ -263,7 +290,7 @@
       <div class="type-chip${selectedTypeId === t.id ? ' selected' : ''}"
            data-id="${t.id}"
            style="background:${t.color}33; color:${t.color}">
-        ${t.name}
+        ${t.name}${t.default_duration_minutes ? ` <span style="opacity:0.7">${t.default_duration_minutes}′</span>` : ''}
       </div>
     `
       )
@@ -272,35 +299,57 @@
     el.querySelectorAll('.type-chip').forEach((chip) => {
       chip.addEventListener('click', () => {
         selectedTypeId = parseInt(chip.dataset.id);
+        // Auto-fill duration from type default
+        const type = exerciseTypes.find((t) => t.id === selectedTypeId);
+        if (type && type.default_duration_minutes) {
+          document.getElementById('duration').value = type.default_duration_minutes;
+        }
         renderTypeChips();
       });
     });
   }
 
   async function saveWorkout() {
-    if (!selectedTypeId) return;
+    if (!selectedTypeId) {
+      // Flash the type picker to hint the user
+      document.getElementById('type-picker').style.outline = '2px solid var(--danger)';
+      setTimeout(() => { document.getElementById('type-picker').style.outline = ''; }, 1000);
+      return;
+    }
     const duration = parseInt(document.getElementById('duration').value);
     if (!duration || duration < 1) return;
 
-    const data = {
-      exercise_type_id: selectedTypeId,
-      date: selectedDate,
-      duration_minutes: duration,
-      notes: document.getElementById('notes').value.trim() || undefined,
-    };
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
 
-    const saved = await api('/workouts', { method: 'POST', body: JSON.stringify(data) });
+    try {
+      const data = {
+        exercise_type_id: selectedTypeId,
+        date: selectedDate,
+        duration_minutes: duration,
+        notes: document.getElementById('notes').value.trim() || undefined,
+      };
 
-    // Add to cache with type info
-    const type = exerciseTypes.find((t) => t.id === selectedTypeId);
-    saved.exercise_type_name = type ? type.name : 'Unknown';
-    saved.exercise_type_color = type ? type.color : '#888';
+      const saved = await api('/workouts', { method: 'POST', body: JSON.stringify(data) });
 
-    if (!workoutsCache[selectedDate]) workoutsCache[selectedDate] = [];
-    workoutsCache[selectedDate].push(saved);
+      // Add to cache with type info
+      const type = exerciseTypes.find((t) => t.id === selectedTypeId);
+      saved.exercise_type_name = type ? type.name : 'Unknown';
+      saved.exercise_type_color = type ? type.color : '#888';
 
-    closeSheet();
-    renderWeeks();
+      if (!workoutsCache[selectedDate]) workoutsCache[selectedDate] = [];
+      workoutsCache[selectedDate].push(saved);
+
+      closeSheet();
+      renderWeeks();
+    } catch (e) {
+      console.error('Save failed:', e);
+      saveBtn.textContent = 'Error — retry';
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
   }
 
   // --- Settings ---
@@ -314,6 +363,108 @@
     document.getElementById('settings-overlay').classList.add('hidden');
   }
 
+  // --- Drag & Drop Reorder (touch + mouse) ---
+
+  function initDragReorder(container) {
+    let dragEl = null;
+    let placeholder = null;
+    let startY = 0;
+    let offsetY = 0;
+    let items = [];
+
+    function getY(e) {
+      return e.touches ? e.touches[0].clientY : e.clientY;
+    }
+
+    function onStart(e) {
+      const handle = e.target.closest('.ti-drag-handle');
+      if (!handle) return;
+      dragEl = handle.closest('.type-item');
+      if (!dragEl) return;
+
+      e.preventDefault();
+      startY = getY(e);
+      const rect = dragEl.getBoundingClientRect();
+      offsetY = startY - rect.top;
+
+      // Create placeholder
+      placeholder = document.createElement('div');
+      placeholder.className = 'type-item ti-placeholder';
+      placeholder.style.height = rect.height + 'px';
+      dragEl.parentNode.insertBefore(placeholder, dragEl);
+
+      // Float the dragged element
+      dragEl.classList.add('ti-dragging');
+      dragEl.style.width = rect.width + 'px';
+      dragEl.style.top = rect.top + 'px';
+      dragEl.style.left = rect.left + 'px';
+
+      items = Array.from(container.querySelectorAll('.type-item:not(.ti-dragging):not(.ti-placeholder)'));
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onEnd);
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onEnd);
+    }
+
+    function onMove(e) {
+      if (!dragEl) return;
+      e.preventDefault();
+      const y = getY(e);
+      dragEl.style.top = (y - offsetY) + 'px';
+
+      // Find which item we're over
+      for (const item of items) {
+        const rect = item.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        if (y < mid) {
+          container.insertBefore(placeholder, item);
+          return;
+        }
+      }
+      // Past last item
+      container.appendChild(placeholder);
+    }
+
+    function onEnd() {
+      if (!dragEl) return;
+      // Insert dragged element where placeholder is
+      container.insertBefore(dragEl, placeholder);
+      dragEl.classList.remove('ti-dragging');
+      dragEl.style.width = '';
+      dragEl.style.top = '';
+      dragEl.style.left = '';
+      placeholder.remove();
+
+      // Read new order from DOM
+      const newOrder = Array.from(container.querySelectorAll('.type-item'))
+        .map((el) => parseInt(el.dataset.id));
+
+      // Reorder exerciseTypes array to match
+      const byId = {};
+      exerciseTypes.forEach((t) => { byId[t.id] = t; });
+      exerciseTypes = newOrder.map((id) => byId[id]).filter(Boolean);
+
+      // Persist sort_order to API
+      const updates = exerciseTypes.map((t, i) => {
+        t.sort_order = i;
+        return api(`/exercise-types/${t.id}`, { method: 'PUT', body: JSON.stringify({ sort_order: i }) });
+      });
+      Promise.all(updates).catch((err) => console.error('Reorder save failed:', err));
+
+      dragEl = null;
+      placeholder = null;
+
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onEnd);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
+    }
+
+    container.addEventListener('mousedown', onStart);
+    container.addEventListener('touchstart', onStart, { passive: false });
+  }
+
   function renderTypesList() {
     const el = document.getElementById('types-list');
     if (exerciseTypes.length === 0) {
@@ -324,16 +475,38 @@
     el.innerHTML = exerciseTypes
       .map(
         (t) => `
-      <div class="type-item" data-id="${t.id}">
+      <div class="type-item" draggable="true" data-id="${t.id}">
+        <div class="ti-drag-handle">⠿</div>
         <div class="ti-info">
           <span class="ti-swatch" style="background:${t.color}"></span>
           <span class="ti-name">${t.name}</span>
         </div>
-        <button class="ti-delete" data-id="${t.id}" aria-label="Delete">✕</button>
+        <div class="ti-actions">
+          <input type="number" class="ti-dur-input" data-id="${t.id}"
+            value="${t.default_duration_minutes || ''}" placeholder="min"
+            min="1" max="300" inputmode="numeric">
+          <button class="ti-delete" data-id="${t.id}" aria-label="Delete">✕</button>
+        </div>
       </div>
     `
       )
       .join('');
+
+    // Drag and drop reorder (works with both mouse and touch)
+    initDragReorder(el);
+
+    el.querySelectorAll('.ti-dur-input').forEach((input) => {
+      input.addEventListener('change', async () => {
+        const id = parseInt(input.dataset.id);
+        const val = input.value ? parseInt(input.value) : null;
+        await api(`/exercise-types/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ default_duration_minutes: val }),
+        });
+        const type = exerciseTypes.find((t) => t.id === id);
+        if (type) type.default_duration_minutes = val;
+      });
+    });
 
     el.querySelectorAll('.ti-delete').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -348,16 +521,20 @@
   async function addExerciseType() {
     const nameEl = document.getElementById('new-type-name');
     const colorEl = document.getElementById('new-type-color');
+    const durationEl = document.getElementById('new-type-duration');
     const name = nameEl.value.trim();
     if (!name) return;
 
+    const defaultDuration = durationEl.value ? parseInt(durationEl.value) : null;
+
     const created = await api('/exercise-types', {
       method: 'POST',
-      body: JSON.stringify({ name, color: colorEl.value }),
+      body: JSON.stringify({ name, color: colorEl.value, default_duration_minutes: defaultDuration }),
     });
 
     exerciseTypes.push(created);
     nameEl.value = '';
+    durationEl.value = '';
     renderTypesList();
   }
 

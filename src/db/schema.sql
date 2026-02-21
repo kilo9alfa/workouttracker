@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS exercise_types (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   color TEXT NOT NULL DEFAULT '#4ade80',
+  default_duration_minutes INTEGER,
   sort_order INTEGER DEFAULT 0,
   created_by TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))

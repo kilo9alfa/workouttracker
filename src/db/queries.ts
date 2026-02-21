@@ -29,11 +29,12 @@ export async function createExerciseType(
   db: D1Database,
   userEmail: string,
   name: string,
-  color: string
+  color: string,
+  defaultDuration: number | null
 ) {
   return db
-    .prepare('INSERT INTO exercise_types (name, color, created_by) VALUES (?, ?, ?) RETURNING *')
-    .bind(name, color, userEmail)
+    .prepare('INSERT INTO exercise_types (name, color, default_duration_minutes, created_by) VALUES (?, ?, ?, ?) RETURNING *')
+    .bind(name, color, defaultDuration, userEmail)
     .first();
 }
 
@@ -41,7 +42,7 @@ export async function updateExerciseType(
   db: D1Database,
   id: number,
   userEmail: string,
-  data: { name?: string; color?: string; sort_order?: number }
+  data: { name?: string; color?: string; sort_order?: number; default_duration_minutes?: number | null }
 ) {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -49,6 +50,7 @@ export async function updateExerciseType(
   if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name); }
   if (data.color !== undefined) { fields.push('color = ?'); values.push(data.color); }
   if (data.sort_order !== undefined) { fields.push('sort_order = ?'); values.push(data.sort_order); }
+  if (data.default_duration_minutes !== undefined) { fields.push('default_duration_minutes = ?'); values.push(data.default_duration_minutes); }
 
   if (fields.length === 0) return null;
 
